@@ -11,7 +11,7 @@ def main():
     args = parser.parse_args()
 
     ########################## init ##########################
-    gs.init(seed=0, precision="32", logging_level="debug")
+    gs.init(seed=0, precision="32", logging_level="debug", backend=gs.metal)
 
     ########################## create a scene ##########################
     scene = gs.Scene(
@@ -24,15 +24,18 @@ def main():
             upper_bound=(1.0, 1.0, 1.5),
         ),
         viewer_options=gs.options.ViewerOptions(
+            res=(1280, 960),
             camera_pos=(5.5, 6.5, 3.2),
             camera_lookat=(0.5, 1.5, 1.5),
             camera_fov=35,
             max_FPS=120,
         ),
-        show_viewer=args.vis,
+        show_viewer=True,
+#        show_viewer=args.vis,
         sph_options=gs.options.SPHOptions(
             particle_size=0.02,
         ),
+        renderer=gs.renderers.Rasterizer(),  # using rasterizer for camera rendering
     )
 
     plane = scene.add_entity(gs.morphs.Plane())
@@ -54,18 +57,26 @@ def main():
         ),
     )
     scene.build()
-
     horizon = 500
-    for i in range(horizon):
-        print(i)
-        emitter.emit(
-            pos=np.array([0.5, 1.0, 3.5]),
-            direction=np.array([0.0, 0, -1.0]),
-            speed=5.0,
-            droplet_shape="circle",
-            droplet_size=0.22,
-        )
-        scene.step()
+
+    def run_sim(scene):
+        for i in range(horizon):
+            print(i)
+            emitter.emit(
+                pos=np.array([0.5, 1.0, 3.5]),
+                direction=np.array([0.0, 0, -1.0]),
+                speed=5.0,
+                droplet_shape="circle",
+                droplet_size=0.22,
+            )
+            scene.step()
+    # You need to run simulation in a separate thread on MacOS
+    gs.tools.run_in_another_thread(fn=run_sim, args=(scene,))
+    # This must be called from the main thread after starting the thread
+    scene.viewer.start()
+
+
+
 
 
 if __name__ == "__main__":
